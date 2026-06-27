@@ -12,7 +12,7 @@ It handles both **gRPC** and **WebSocket** setups smoothly.
 
 ## 🚀 How to Use
 
-1. **Visit the App:** Go to the [GitHub Pages link of this repository].
+1. **Visit the App:** [LINK](https://extremedot.github.io/CF_Scanner_Config_Generator/) ].
 2. **Input Config:** 
    * Upload your original Xray/V2Ray `.json` config file.
    * *OR* paste the raw JSON text directly into the text box.
