@@ -1,5 +1,12 @@
 # CF Scanner Config Generator 🛠️
 
+[WEBPAGE ADDRESS](https://extremedot.github.io/CF_Scanner_Config_Generator/)
+
+<img width="995" height="567" alt="image" src="https://github.com/user-attachments/assets/f0ca1709-1de3-4556-8a31-196e2db98f3d" />
+
+---
+
+
 A smart and fully client-side web tool designed to automatically convert standard Xray/V2Ray configurations into Cloudflare Scanner-ready formats. 
 
 It handles both **gRPC** and **WebSocket** setups smoothly.
