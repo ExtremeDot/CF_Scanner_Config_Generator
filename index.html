@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CF Scanner Config Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;700&display=swap');
+        body { font-family: 'Vazirmatn', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-4 dir-rtl">
+
+    <div class="max-w-4xl mx-auto my-6">
+        <!-- Header -->
+        <header class="text-center mb-8 border-b border-gray-800 pb-4">
+            <h1 class="text-2xl font-bold text-blue-400">CF Scanner Config Generator</h1>
+            <p class="text-gray-400 mt-2 text-sm">استخراج هوشمند اوتباند و اصلاح هدرهای WebSocket برای اسکنر</p>
+        </header>
+
+        <!-- Main Input Container -->
+        <div class="bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-700 space-y-6">
+            
+            <!-- Step 1: Input Config -->
+            <div>
+                <label class="block text-sm font-bold text-gray-300 mb-2">۱. کانفیگ اصلی (Xray / V2Ray JSON) را وارد کنید:</label>
+                
+                <!-- File Upload Box -->
+                <div class="mb-3">
+                    <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-600 border-dashed rounded-lg cursor-pointer bg-gray-700 hover:bg-gray-600 transition">
+                        <div class="flex flex-col items-center justify-center pt-4 pb-4">
+                            <svg class="w-8 h-8 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                            <p class="text-sm text-gray-400"><span class="font-bold">آپلود فایل JSON</span> یا رها کردن فایل اینجا</p>
+                        </div>
+                        <input id="file-input" type="file" class="hidden" accept=".json" />
+                    </label>
+                </div>
+
+                <!-- Text Area Input -->
+                <textarea id="raw-json-input" rows="8" placeholder="یا متن کامل کانفیگ JSON خود را اینجا کپی کنید..." class="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-left font-mono text-xs text-blue-300 placeholder-gray-500 focus:outline-none focus:border-blue-500" dir="ltr"></textarea>
+            </div>
+
+            <!-- Error message container -->
+            <div id="error-message" class="hidden text-red-400 bg-red-900/30 border border-red-800 rounded p-3 text-sm"></div>
+
+            <!-- Action Buttons -->
+            <div class="text-center">
+                <button id="process-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3 rounded-xl transition shadow-md w-full sm:w-auto">
+                    تبدیل هوشمند و اصلاح هدرها
+                </button>
+            </div>
+
+            <!-- Step 2: Output Config -->
+            <div id="output-section" class="hidden space-y-3 pt-4 border-t border-gray-700">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-bold text-green-400">۲. کانفیگ نهایی اسکنر (تصحیح شده):</label>
+                    <div class="space-x-2 space-x-reverse">
+                        <button id="copy-btn" class="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-1.5 rounded transition">کپی در کلیپ‌بورد</button>
+                        <button id="download-btn" class="bg-green-700 hover:bg-green-600 text-xs px-3 py-1.5 rounded transition">دانلود فایل JSON</button>
+                    </div>
+                </div>
+                <pre id="final-output" class="bg-gray-950 p-4 rounded text-xs text-left text-green-400 font-mono overflow-x-auto h-96 border border-gray-800" dir="ltr"></pre>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- JavaScript Processing Logic -->
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const rawJsonInput = document.getElementById('raw-json-input');
+        const processBtn = document.getElementById('process-btn');
+        const errorMessage = document.getElementById('error-message');
+        const outputSection = document.getElementById('output-section');
+        const finalOutput = document.getElementById('final-output');
+        const copyBtn = document.getElementById('copy-btn');
+        const downloadBtn = document.getElementById('download-btn');
+
+        const fixedInbounds = [
+            {
+                "tag": "socks",
+                "port": "PORTPORT",
+                "listen": "127.0.0.1",
+                "protocol": "socks",
+                "sniffing": {
+                    "enabled": true,
+                    "destOverride": ["http", "tls"],
+                    "routeOnly": false
+                },
+                "settings": {
+                    "auth": "noauth",
+                    "udp": true,
+                    "allowTransparent": false
+                }
+            }
+        ];
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                rawJsonInput.value = event.target.result;
+                showError("");
+            };
+            reader.readAsText(file);
+        });
+
+        function showError(msg) {
+            if (msg) {
+                errorMessage.textContent = msg;
+                errorMessage.classList.remove('hidden');
+            } else {
+                errorMessage.classList.add('hidden');
+            }
+        }
+
+        // 1. تغییر دادن تمام فیلدهای address به IP.IP.IP.IP
+        function modifyAddressFields(obj) {
+            if (typeof obj !== 'object' || obj === null) return;
+
+            if (Array.isArray(obj)) {
+                for (let i = 0; i < obj.length; i++) {
+                    modifyAddressFields(obj[i]);
+                }
+            } else {
+                for (let key in obj) {
+                    if (obj.hasOwnProperty(key)) {
+                        if (key === 'address') {
+                            obj[key] = "IP.IP.IP.IP";
+                        } else {
+                            modifyAddressFields(obj[key]);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. بررسی هوشمند و تزریق هدر Host در صورت خالی یا گم‌شدن در wsSettings
+        function fixWebSocketHeaders(outbounds) {
+            if (!Array.isArray(outbounds)) return;
+
+            outbounds.forEach(outbound => {
+                if (outbound.streamSettings && outbound.streamSettings.network === 'ws') {
+                    const wsSettings = outbound.streamSettings.wsSettings;
+                    if (wsSettings) {
+                        const hostValue = wsSettings.host || (outbound.streamSettings.tlsSettings ? outbound.streamSettings.tlsSettings.serverName : "");
+                        
+                        // اگر بخش headers وجود نداشت یا خالی بود یا کلید Host نداشت
+                        if (!wsSettings.headers || Object.keys(wsSettings.headers).length === 0 || !wsSettings.headers.Host) {
+                            if (hostValue) {
+                                wsSettings.headers = wsSettings.headers || {};
+                                wsSettings.headers["Host"] = hostValue;
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        processBtn.addEventListener('click', () => {
+            showError("");
+            outputSection.classList.add('hidden');
+
+            let inputStr = rawJsonInput.value.trim();
+            if (!inputStr) {
+                showError("لطفاً ابتدا متنی وارد کنید یا فایلی آپلود نمایید.");
+                return;
+            }
+
+            let parsedJson;
+            try {
+                parsedJson = JSON.parse(inputStr);
+            } catch (e) {
+                showError("خطا در پردازش JSON! لطفاً مطمئن شوید که فرمت فایل ورودی یک JSON معتبر است.");
+                return;
+            }
+
+            let finalOutbounds = [];
+
+            if (parsedJson.outbounds && Array.isArray(parsedJson.outbounds)) {
+                finalOutbounds = parsedJson.outbounds;
+            } else if (typeof parsedJson === 'object' && !Array.isArray(parsedJson)) {
+                finalOutbounds = [parsedJson];
+            } else if (Array.isArray(parsedJson)) {
+                finalOutbounds = parsedJson;
+            } else {
+                showError("ساختار معتبری برای اوتباند (outbound) پیدا نشد.");
+                return;
+            }
+
+            let processedOutbounds = JSON.parse(JSON.stringify(finalOutbounds));
+
+            // اعمال تغییرات آدرس
+            modifyAddressFields(processedOutbounds);
+
+            // اصلاح و پر کردن هدرهای WebSocket در صورت نقص فنی
+            fixWebSocketHeaders(processedOutbounds);
+
+            const finalConfig = {
+                "inbounds": fixedInbounds,
+                "outbounds": processedOutbounds
+            };
+
+            finalOutput.textContent = JSON.stringify(finalConfig, null, 2);
+            outputSection.classList.remove('hidden');
+        });
+
+        copyBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(finalOutput.textContent).then(() => {
+                alert('کانفیگ جدید با موفقیت کپی شد!');
+            });
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const blob = new Blob([finalOutput.textContent], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "cf-scanner-config.json";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
